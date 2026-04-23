@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>MURTHELP · terminal restrito</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  
+</head>
+<body>
+<div class="bg-gradient"></div>
+<div class="noise"></div>
+<div class="container">
+  <div class="top-bar">
+    <div class="logo"><h1>MURTHELP</h1><p>✦ terminal restrito</p></div>
+    <div class="nav-links">
+      <a href="index.html" style="color:#30b95c;">INÍCIO</a>
+      <a href="rules.html">REGRAS</a>
+    </div>
+  </div>
+  <div class="hero">
+    <h2>não é apenas uma loja.<br>é o <span>código</span> que te define.</h2>
+    <p>identificação hierárquica obrigatória.</p>
+  </div>
+
+  <!-- ÁREA DE ALERTA GLOBAL -->
+  <div id="alertBanner" class="alert-banner">
+    <span>⚠️ PROTOCOLO DE SEGURANÇA VIOLADO — CAÇA AUTORIZADA</span>
+    <span id="timerDisplay">30:00</span>
+  </div>
+
+  <!-- Área principal que só aparece após primeiro acesso (realista) -->
+  <div id="gameArea" class="game-area" style="display: none;">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-title">código hierárquico</div>
+        <div class="stat-value" id="rankTitle">---</div>
+        <div class="stat-sub">status baseado na cor autorizada</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">saldo de operações</div>
+        <div class="stat-value" id="pointsDisplay">0</div>
+        <div class="stat-sub">próximo nível: <span id="nextTitle">---</span></div>
+      </div>
+    </div>
+    <div class="desafio-box">
+      <div class="desafio-pergunta" id="dailyQuestion">Carregando missão...</div>
+      <div class="desafio-resposta">
+        <input type="text" id="dailyAnswer" placeholder="sua resposta" autocomplete="off">
+        <button id="submitDaily">responder</button>
+      </div>
+      <div id="dailyFeedback" style="font-size:0.75rem; margin-top:0.8rem;"></div>
+    </div>
+  </div>
+
+  <!-- Bloqueio inicial realista -->
+  <div id="gameLockMessage" class="game-start-message">
+    <span style="font-size:1.8rem;">⛔</span><br>
+    <strong>ACESSO RESTRITO · CÓDIGO VERDE NÃO IDENTIFICADO</strong><br>
+    Selecione um código (Verde, Amarelo, Roxo, Vermelho) e clique em <strong>"acessar o shopping"</strong><br>
+    para autenticação e entrada no sistema Murthelp.
+    <div style="font-size:0.7rem; margin-top:1rem; color:#e33b3b;">🔒 Tentativas não autorizadas são registradas.</div>
+  </div>
+
+  <div class="prime-regra">
+    <strong>🛡️ PROTOCOLO MÁRTIR</strong><br>
+    Qualquer ataque a um Operador (Verde) resulta em caça coletiva.
+  </div>
+
+  <div class="codes-grid">
+    <div class="code-card"><div class="card-header"><div class="color-dot green-dot"></div><h4>VERDE · OPERADOR</h4></div><div style="font-size:0.85rem;">Acesso total, exige senha.</div></div>
+    <div class="code-card"><div class="card-header"><div class="color-dot red-dot"></div><h4>VERMELHO · KILL</h4></div><div style="font-size:0.85rem;">Assassino de aluguel.</div></div>
+    <div class="code-card"><div class="card-header"><div class="color-dot purple-dot"></div><h4>ROXO · ESPIÃO</h4></div><div style="font-size:0.85rem;">Vigilância e informação.</div></div>
+    <div class="code-card"><div class="card-header"><div class="color-dot yellow-dot"></div><h4>AMARELO · LIMPEZA</h4></div><div style="font-size:0.85rem;">Eliminação de evidências.</div></div>
+  </div>
+
+  <div class="acesso-simulacao">
+    <h3>🔐 autenticação de código</h3>
+    <div class="code-selector" id="codeSelector">
+      <button data-code="verde" class="code-btn">🟢 VERDE</button>
+      <button data-code="amarelo" class="code-btn">🟡 AMARELO</button>
+      <button data-code="roxo" class="code-btn">🟣 ROXO</button>
+      <button data-code="vermelho" class="code-btn">🔴 VERMELHO</button>
+    </div>
+    <button id="acessarBtn" class="enter-shop">› acessar o shopping ‹</button>
+    <div id="feedbackMsg" class="feedback-message"></div>
+  </div>
+  <footer>MURTHELP · sistema hierárquico | alertas globais ativos</footer>
+</div>
+
+<script>
+  // ---------- ESTADO GLOBAL ----------
+  let gameStarted = false;          // se o usuario já fez primeiro acesso
+  let currentCode = null;           // código selecionado
+  let currentPoints = 0;
+  let alertActive = false;           // modo alerta ativo?
+  let wrongAttempts = 0;             // tentativas erradas de senha do verde
+  let alertTimerInterval = null;
+  let alertSecondsRemaining = 30 * 60; // 30 minutos em segundos
+  
+  // Elementos
+  const gameArea = document.getElementById('gameArea');
+  const lockMsg = document.getElementById('gameLockMessage');
+  const alertBanner = document.getElementById('alertBanner');
+  const timerDisplaySpan = document.getElementById('timerDisplay');
+  const rankTitleSpan = document.getElementById('rankTitle');
+  const pointsDisplaySpan = document.getElementById('pointsDisplay');
+  const nextTitleSpan = document.getElementById('nextTitle');
+  
+  // Funções de pontos (mantidas para saldo)
+  function loadPoints() {
+    const saved = localStorage.getItem("murthelp_points");
+    currentPoints = (saved && !isNaN(parseInt(saved))) ? parseInt(saved) : 0;
+    pointsDisplaySpan.innerText = currentPoints;
+  }
+  function savePoints() { localStorage.setItem("murthelp_points", currentPoints); }
+  function addPoints(amount) {
+    if (!gameStarted) return;
+    currentPoints += amount;
+    savePoints();
+    pointsDisplaySpan.innerText = currentPoints;
+    updateNextTitle();
+  }
+  function updateNextTitle() {
+    if(currentPoints >= 500) nextTitleSpan.innerText = "🥇 lenda";
+    else if(currentPoints >= 200) nextTitleSpan.innerText = "assassino veterano (500)";
+    else if(currentPoints >= 100) nextTitleSpan.innerText = "espião sombra (200)";
+    else if(currentPoints >= 50) nextTitleSpan.innerText = "limpador especialista (100)";
+    else nextTitleSpan.innerText = "iniciante (50 pts)";
+  }
+  
+  // Títulos por cor (sem pontos)
+  function getTitleByCode(code) {
+    if(code === 'verde') return "🟢 Operador · Código Verde";
+    if(code === 'amarelo') return "🟡 Agente de Limpeza · Código Amarelo";
+    if(code === 'roxo') return "🟣 Espião · Código Roxo";
+    if(code === 'vermelho') return "🔴 Assassino · Código Vermelho";
+    return "---";
+  }
+  
+  // Atualiza o título hierárquico
+  function setHierarchicalTitle(code) {
+    if (code) rankTitleSpan.innerText = getTitleByCode(code);
+    else rankTitleSpan.innerText = "---";
+  }
+  
+  // DESAFIO DIÁRIO
+  function getDailyChallenge() {
+    const day = new Date().getDate();
+    const questions = [
+      { q: "Qual o nome do tio da Jeong Ji-an?", a: "jeong jin man" },
+      { q: "Qual o nome do shopping secreto?", a: "murthehelp" },
+      { q: "Qual código é proibido de ser atacado?", a: "verde" },
+      { q: "Quem interpreta o tio na série?", a: "lee dong wook" },
+      { q: "Qual a cor do código dos assassinos?", a: "vermelho" },
+      { q: "O que acontece se atacarem um verde?", a: "protocolo martir" },
+    ];
+    return questions[day % questions.length];
+  }
+  let dailyAnswered = false;
+  function checkDailyStatus() {
+    if(!gameStarted) return;
+    const last = localStorage.getItem("murthelp_lastDailyDate");
+    const today = new Date().toDateString();
+    if(last === today) {
+      dailyAnswered = true;
+      document.getElementById("dailyFeedback").innerHTML = "✅ Missão já cumprida hoje.";
+      document.getElementById("submitDaily").disabled = true;
+      document.getElementById("dailyAnswer").disabled = true;
+    } else {
+      dailyAnswered = false;
+      document.getElementById("submitDaily").disabled = false;
+      document.getElementById("dailyAnswer").disabled = false;
+    }
+  }
+  function submitDailyAnswer() {
+    if(!gameStarted){ alert("Terminal bloqueado. Acesse primeiro."); return; }
+    if(dailyAnswered) { document.getElementById("dailyFeedback").innerHTML = "Já respondeu hoje."; return; }
+    const input = document.getElementById("dailyAnswer").value.trim().toLowerCase();
+    const chal = getDailyChallenge();
+    if(input === chal.a.toLowerCase()) {
+      addPoints(20);
+      document.getElementById("dailyFeedback").innerHTML = "🎉 +20 pontos de reputação. Missão concluída.";
+      dailyAnswered = true;
+      localStorage.setItem("murthelp_lastDailyDate", new Date().toDateString());
+      document.getElementById("submitDaily").disabled = true;
+      document.getElementById("dailyAnswer").disabled = true;
+    } else {
+      document.getElementById("dailyFeedback").innerHTML = `❌ Falha na missão. Dica: ${chal.a.substring(0,3)}...`;
+    }
+  }
+  
+  // ---------- ALERTA GLOBAL (30 MINUTOS) ----------
+  function stopAlertTimer() {
+    if(alertTimerInterval) { clearInterval(alertTimerInterval); alertTimerInterval = null; }
+  }
+  function startAlertTimer() {
+    alertActive = true;
+    alertBanner.classList.add('show');
+    stopAlertTimer();
+    alertSecondsRemaining = 30 * 60;
+    updateTimerDisplay();
+    alertTimerInterval = setInterval(() => {
+      if(alertSecondsRemaining <= 1) {
+        // tempo esgotado: caçado
+        stopAlertTimer();
+        alertBanner.innerHTML = '<span>🔴 CAÇA EM ANDAMENTO — VOCÊ FOI RASTREADO. SISTEMA BLOQUEADO.</span>';
+        alertBanner.style.background = 'rgba(227,59,59,0.5)';
+        gameStarted = false;  // trava tudo
+        gameArea.style.display = 'none';
+        lockMsg.style.display = 'block';
+        lockMsg.innerHTML = '<strong>🔴 VOCÊ FOI CAÇADO</strong><br>Operação comprometida. Entre em contato com o código verde.';
+        return;
+      }
+      alertSecondsRemaining--;
+      updateTimerDisplay();
+    }, 1000);
+  }
+  function updateTimerDisplay() {
+    let minutes = Math.floor(alertSecondsRemaining / 60);
+    let secs = alertSecondsRemaining % 60;
+    timerDisplaySpan.innerText = `${minutes.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+  }
+  function resetAlert() {
+    alertActive = false;
+    alertBanner.classList.remove('show');
+    stopAlertTimer();
+    wrongAttempts = 0;
+  }
+  
+  // ---------- SENHA DO VERDE (popup) ----------
+  function promptVerdePassword(onSuccess, onFailure) {
+    // Cria overlay e popup
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    const popup = document.createElement('div');
+    popup.className = 'password-prompt';
+    popup.innerHTML = `
+      <strong>🔐 AUTENTICAÇÃO DE OPERADOR</strong><br>
+      <input type="password" id="verdePasswordInput" placeholder="senha de acesso" autocomplete="off">
+      <div style="display:flex; gap:1rem; margin-top:1rem;">
+        <button id="confirmPwd">confirmar</button>
+        <button id="cancelPwd">cancelar</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    document.body.appendChild(popup);
+    const input = popup.querySelector('#verdePasswordInput');
+    const confirmBtn = popup.querySelector('#confirmPwd');
+    const cancelBtn = popup.querySelector('#cancelPwd');
+    
+    function clean() { overlay.remove(); popup.remove(); }
+    confirmBtn.onclick = () => {
+      const pwd = input.value.trim();
+      clean();
+      if(pwd === "Erick") {
+        onSuccess();
+      } else {
+        onFailure();
+      }
+    };
+    cancelBtn.onclick = () => { clean(); onFailure(); };
+    input.focus();
+  }
+  
+  // ação de acessar (main)
+  const codeBtns = document.querySelectorAll('.code-btn');
+  let selectedCode = null;
+  const feedbackDiv = document.getElementById('feedbackMsg');
+  const acessarBtn = document.getElementById('acessarBtn');
+  
+  function updateSelectedCode(code) {
+    selectedCode = code;
+    codeBtns.forEach(btn => {
+      if(btn.getAttribute('data-code') === code) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+  }
+  codeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      updateSelectedCode(btn.getAttribute('data-code'));
+      feedbackDiv.innerHTML = `✅ Código ${btn.innerText} selecionado. Clique em acessar.`;
+    });
+  });
+  
+  function unlockGameFirstTime() {
+    if(gameStarted) return;
+    gameStarted = true;
+    gameArea.style.display = 'block';
+    lockMsg.style.display = 'none';
+    loadPoints();
+    updateNextTitle();
+    // desafio
+    const chal = getDailyChallenge();
+    document.getElementById("dailyQuestion").innerText = "📌 " + chal.q;
+    document.getElementById("submitDaily").onclick = submitDailyAnswer;
+    checkDailyStatus();
+    feedbackDiv.innerHTML = "🔓 Terminal liberado. Ações registradas no sistema.";
+  }
+  
+  // Lógica principal ao clicar em acessar
+  acessarBtn.addEventListener('click', () => {
+    if(!selectedCode) {
+      feedbackDiv.innerHTML = "❌ Selecione um código de acesso.";
+      return;
+    }
+    // Se estiver em alerta global
+    if(alertActive) {
+      // Só permite tentar verde para desbloquear
+      if(selectedCode === 'verde') {
+        promptVerdePassword(
+          () => { // acertou durante alerta
+            resetAlert();
+            feedbackDiv.innerHTML = "✅ Alerta cancelado. Sistema restaurado. Acesso verde liberado.";
+            setHierarchicalTitle('verde');
+            if(!gameStarted) unlockGameFirstTime();
+            // reset tentativas
+            wrongAttempts = 0;
+          },
+          () => { // errou durante alerta
+            wrongAttempts++;
+            feedbackDiv.innerHTML = `❌ Senha incorreta. Tentativa ${wrongAttempts}/3. Alerta continua.`;
+            if(wrongAttempts >= 3) {
+              // já está em alerta, só reseta o contador interno pra não dar loop
+              wrongAttempts = 0;
+              feedbackDiv.innerHTML += " Nova sequência de 3 tentativas reiniciada.";
+            }
+          }
+        );
+      } else {
+        feedbackDiv.innerHTML = "⛔ SISTEMA EM ALERTA. Apenas operador verde pode desativar o protocolo.";
+      }
+      return;
+    }
+    
+    // Fluxo normal (sem alerta)
+    if(selectedCode === 'verde') {
+      promptVerdePassword(
+        () => { // senha correta
+          feedbackDiv.innerHTML = "🔓 Acesso verde concedido. Operador autenticado.";
+          setHierarchicalTitle('verde');
+          if(!gameStarted) unlockGameFirstTime();
+          wrongAttempts = 0;
+          // ganha 10 pontos (primeira vez do dia? mantemos o sistema de pontos)
+          const lastAccess = localStorage.getItem("murthelp_lastAccessDate");
+          const today = new Date().toDateString();
+          if(lastAccess !== today && gameStarted) {
+            addPoints(10);
+            localStorage.setItem("murthelp_lastAccessDate", today);
+            feedbackDiv.innerHTML += " +10 pontos de reputação.";
+          }
+        },
+        () => { // senha errada
+          wrongAttempts++;
+          feedbackDiv.innerHTML = `❌ Senha incorreta. Tentativa ${wrongAttempts}/3.`;
+          if(wrongAttempts >= 3) {
+            startAlertTimer();  // ativa alerta global de 30 min
+            feedbackDiv.innerHTML = "⚠️ ALERTA GLOBAL ATIVADO! Três tentativas falhas. Você está sendo caçado. Use o código verde para desativar.";
+            wrongAttempts = 0;
+            // Se o jogo ainda não tinha iniciado, não inicia ainda
+            if(gameStarted) {
+              // apenas mostra alerta
+            } else {
+              // bloqueia também
+              lockMsg.style.display = 'block';
+              gameArea.style.display = 'none';
+            }
+          }
+        }
+      );
+    } else {
+      // Amarelo, Roxo, Vermelho: sem senha
+      setHierarchicalTitle(selectedCode);
+      if(!gameStarted) unlockGameFirstTime();
+      feedbackDiv.innerHTML = `🔓 Acesso liberado como ${getTitleByCode(selectedCode)}.`;
+      const lastAccess = localStorage.getItem("murthelp_lastAccessDate");
+      const today = new Date().toDateString();
+      if(lastAccess !== today && gameStarted) {
+        addPoints(10);
+        localStorage.setItem("murthelp_lastAccessDate", today);
+        feedbackDiv.innerHTML += " +10 pontos de reputação.";
+      }
+      // se for amarelo/roxo/vermelho, também registra que a cor ativa é essa
+    }
+  });
+  
+  // Inicialização: sem alerta ativo, sem jogo iniciado ainda, mas verifica se já havia alerta salvo?
+  // Por simplicidade, estado inicial limpo.
+  loadPoints(); // só carrega pontos pra não perder, mas UI só exibe depois que gameStarted
+  updateNextTitle();
+  // Se quiser persistir alerta entre reloads, poderia, mas não pedido.
+</script>
+</body>
+</html>
